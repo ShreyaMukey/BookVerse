@@ -2,7 +2,7 @@
 name = "bookverse"
 version = "0.1.0"
 description = "Universal Book Intelligence Platform"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "BookVerse Authors"}]
 dependencies = [
@@ -31,7 +31,6 @@ dev = [
     "respx>=0.20.2",
     "ruff>=0.4.8",
     "mypy>=1.10.0",
-    "alembic-autogen>=0.2.0",
 ]
 
 [tool.pytest.ini_options]

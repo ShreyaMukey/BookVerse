@@ -9,11 +9,9 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum,
     Float,
     Index,
     Integer,
-    JSON,
     String,
     Table,
     Text,
@@ -157,13 +155,19 @@ class CanonicalBook(Base):
     themes: Mapped[list["BookCategory"]] = relationship(secondary=book_theme, back_populates="themes")
     tropes: Mapped[list["BookCategory"]] = relationship(secondary=book_trope, back_populates="tropes")
     endings: Mapped[list["EndingMetadata"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
-    enrichments: Mapped[list["EnrichmentResult"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
+    enrichments: Mapped[list["EnrichmentResult"] | None] = relationship(
+        back_populates="book", cascade="all, delete-orphan"
+    )
     embeddings: Mapped[list["Embedding"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
     ratings: Mapped[list["Rating"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
     reviews: Mapped[list["Review"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
-    reading_list_entries: Mapped[list["ReadingListItem"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
+    reading_list_entries: Mapped[list["ReadingListItem"] | None] = relationship(
+        back_populates="book", cascade="all, delete-orphan"
+    )
     feeds: Mapped[list["FeedItem"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
-    editions: Mapped[list["CanonicalEdition"] | None] = relationship(back_populates="book", cascade="all, delete-orphan")
+    editions: Mapped[list["CanonicalEdition"] | None] = relationship(
+        back_populates="book", cascade="all, delete-orphan"
+    )
 
 
 class CanonicalAuthor(Base):
@@ -210,10 +214,87 @@ class BookCategory(Base):
     name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     taxonomy_type: Mapped[str] = mapped_column(String(32))
 
-    books: Mapped[list["CanonicalBook"]] = relationship(secondary=book_genre, back_populates="genres")
-    subjects: Mapped[list["CanonicalBook"]] = relationship(secondary=book_subject, back_populates="subjects")
-    themes: Mapped[list["CanonicalBook"]] = relationship(secondary=book_theme, back_populates="themes")
-    tropes: Mapped[list["CanonicalBook"]] = relationship(secondary=book_trope, back_populates="tropes")
+
+class CanonicalEdition(Base):
+    __tablename__ = "canonical_edition"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    source_id: Mapped[str] = mapped_column(String(255), index=True)
+    format: Mapped[Optional[str]] = mapped_column(String(64))
+    pages: Mapped[Optional[int]] = mapped_column(Integer)
+    isbn10: Mapped[Optional[str]] = mapped_column(String(32))
+    isbn13: Mapped[Optional[str]] = mapped_column(String(32))
+    identifiers: Mapped[Optional[dict]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class BookIdentifier(Base):
+    __tablename__ = "book_identifier"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
+    identifier_type: Mapped[str] = mapped_column(String(64), index=True)
+    value: Mapped[str] = mapped_column(String(255), index=True)
+    url: Mapped[Optional[str]] = mapped_column(String(1024))
+    source: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    is_canonical: Mapped[Optional[bool]] = mapped_column(Boolean, server_default=text("TRUE"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("identifier_type", "value", name="uq_book_identifier_type_value"),
+        Index("ix_book_identifier_book_id", "book_id"),
+    )
+
+
+class Rating(Base):
+    __tablename__ = "rating"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    rating: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("book_id", "user_id", name="uq_rating_book_user"),
+        CheckConstraint("rating >= 1.0 AND rating <= 5.0", name="ck_rating_range"),
+    )
+
+
+class Review(Base):
+    __tablename__ = "review"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    rating_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
+    body: Mapped[Optional[str]] = mapped_column(Text)
+    spoiler: Mapped[Optional[bool]] = mapped_column(Boolean, server_default=text("false"))
+    source: Mapped[Optional[str]] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("book_id", "user_id", name="uq_review_book_user"),
+        CheckConstraint("char_length(body) <= 20000", name="ck_review_length"),
+    )
+
+
+class ReadingListItem(Base):
+    __tablename__ = "reading_list_item"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    status: Mapped[str] = mapped_column(String(32), server_default="to_read")
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("book_id", "user_id", name="uq_reading_list_book_user"),
+        CheckConstraint("status IN ('to_read','reading','finished')", name="ck_reading_status"),
+    )
 
 
 class EnrichmentResult(Base):
@@ -223,139 +304,80 @@ class EnrichmentResult(Base):
     job_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
     model: Mapped[Optional[str]] = mapped_column(String(128))
     fields_enriched: Mapped[Optional[list[str]]] = mapped_column(JSONB)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+    result_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    score: Mapped[Optional[float]] = mapped_column(Float)
-
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="enrichments")
 
 
 class Embedding(Base):
     __tablename__ = "embedding"
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    model: Mapped[str] = mapped_column(String(128))
-    vector: Mapped[Optional[list[float]]] = mapped_column(ARRAY(Float))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="embeddings")
-
-
-class Rating(Base):
-    __tablename__ = "rating"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    score: Mapped[float] = mapped_column(Float)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    provider: Mapped[str] = mapped_column(String(64), server_default="local")
+    model: Mapped[str] = mapped_column(String(128), server_default="sentence-transformers")
+    vector: Mapped[Optional[list[float]]] = mapped_column(JSONB)
+    dim: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="ratings")
+    __table_args__ = (UniqueConstraint("book_id", "provider", "model", name="uq_embedding_book_provider_model"),)
 
 
-class Review(Base):
-    __tablename__ = "review"
+class EndingMetadata(Base):
+    __tablename__ = "ending_metadata"
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    score: Mapped[Optional[float]] = mapped_column(Float)
-    title: Mapped[Optional[str]] = mapped_column(String(255))
-    body: Mapped[Optional[str]] = mapped_column(Text)
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    ending_type: Mapped[str] = mapped_column(String(64), server_default="other")
+    bittersweet: Mapped[Optional[bool]] = mapped_column(Boolean)
+    tragic: Mapped[Optional[bool]] = mapped_column(Boolean)
+    hopeful: Mapped[Optional[bool]] = mapped_column(Boolean)
+    open_ended: Mapped[Optional[bool]] = mapped_column(Boolean)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="reviews")
 
-
-class ReadingListItem(Base):
-    __tablename__ = "reading_list_item"
+class UserProfile(Base):
+    __tablename__ = "user_profile"
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    status: Mapped[str] = mapped_column(String(32), server_default="wishlist")
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(255))
+    display_name: Mapped[Optional[str]] = mapped_column(String(128))
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("TRUE"))
+    is_verified: Mapped[bool] = mapped_column(Boolean, server_default=text("FALSE"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="reading_list_entries")
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
+    user_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), unique=True, index=True)
+    preferences: Mapped[Optional[dict]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
 class FeedItem(Base):
     __tablename__ = "feed_item"
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    feed_name: Mapped[Optional[str]] = mapped_column(String(64))
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    score: Mapped[float] = mapped_column(Float)
-    position: Mapped[int] = mapped_column(Integer)
-    generated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), index=True)
+    feed_type: Mapped[str] = mapped_column(String(64), index=True)
+    rank_score: Mapped[Optional[float]] = mapped_column(Float)
+    reason: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="feeds")
-
-
-class BookVersion(Base):
-    __tablename__ = "book_version"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    version: Mapped[int] = mapped_column(Integer)
-    snapshot: Mapped[Optional[dict]] = mapped_column(JSONB)
-    changed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    __table_args__ = (UniqueConstraint("book_id", "feed_type", name="uq_feed_book_type"),)
 
 
 class ConnectorRun(Base):
     __tablename__ = "connector_run"
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
     source: Mapped[str] = mapped_column(String(64), index=True)
-    status: Mapped[str] = mapped_column(String(32))
-    started_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    records_total: Mapped[Optional[int]] = mapped_column(Integer)
-    records_inserted: Mapped[Optional[int]] = mapped_column(Integer)
+    records_created: Mapped[Optional[int]] = mapped_column(Integer)
     records_updated: Mapped[Optional[int]] = mapped_column(Integer)
+    records_skipped: Mapped[Optional[int]] = mapped_column(Integer)
     records_failed: Mapped[Optional[int]] = mapped_column(Integer)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
-
-
-class MergeLog(Base):
-    __tablename__ = "merge_log"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    source: Mapped[Optional[str]] = mapped_column(String(64))
-    outcome: Mapped[str] = mapped_column(String(32))
-    changes: Mapped[Optional[dict]] = mapped_column(JSONB)
+    result_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
-class EndingMetadata(Base):
-    __tablename__ = "ending_metadata"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    type: Mapped[str] = mapped_column(String(64))
-    note: Mapped[Optional[str]] = mapped_column(Text)
-    confidence: Mapped[Optional[float]] = mapped_column(Float)
-
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="endings")
-
-
-class CanonicalEdition(Base):
-    __tablename__ = "canonical_edition"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    isbn13: Mapped[Optional[str]] = mapped_column(String(13), index=True)
-    isbn10: Mapped[Optional[str]] = mapped_column(String(10), index=True)
-    format: Mapped[Optional[str]] = mapped_column(String(64))
-    pages: Mapped[Optional[int]] = mapped_column(Integer)
-    publisher: Mapped[Optional[str]] = mapped_column(String(255))
-    publication_date: Mapped[Optional[str]] = mapped_column(String(64))
-    source: Mapped[Optional[str]] = mapped_column(String(64))
-
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="editions")
-
-
-class BookIdentifier(Base):
-    __tablename__ = "book_identifier"
-    id: Mapped[str] = mapped_column(UUID(as_uuid=True), server_default=text("gen_random_uuid()"), primary_key=True)
-    book_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True))
-    identifier: Mapped[str] = mapped_column(String(64), index=True)
-    value: Mapped[str] = mapped_column(String(255), index=True)
-    url: Mapped[Optional[str]] = mapped_column(String(1024))
-
-    book: Mapped[Optional["CanonicalBook"]] = relationship(back_populates="identifiers")
-

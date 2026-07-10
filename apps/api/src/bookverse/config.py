@@ -33,3 +33,6 @@ class Settings(BaseSettings):
     rate_limit_default: str = "60/minute"
 
     worker_concurrency: int = 4
+
+
+settings = Settings()
