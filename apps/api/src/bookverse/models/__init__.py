@@ -1,1 +1,0 @@
-/Users/apple/Projects/BookVerse/apps/api/src/bookverse/models.py

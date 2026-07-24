@@ -1,5 +1,5 @@
 from bookverse.config import Settings
-from bookverse.models import Base, CanonicalBook, CanonicalAuthor, BookCategory
+from bookverse.models import Base, BookCategory, CanonicalAuthor, CanonicalBook
 
 
 def test_settings_defaults():

@@ -34,5 +34,9 @@ class Settings(BaseSettings):
 
     worker_concurrency: int = 4
 
+    jwt_secret: str = "dev-only-insecure-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
+
 
 settings = Settings()

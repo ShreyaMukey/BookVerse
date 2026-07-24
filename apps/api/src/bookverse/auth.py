@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -21,7 +20,7 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: str
-    exp: Optional[datetime] = None
+    exp: datetime | None = None
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -32,14 +31,14 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     payload = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
     payload.update({"exp": expire})
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict | None:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError:

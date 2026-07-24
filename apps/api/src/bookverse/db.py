@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from bookverse.config import settings
 
-_engine: Optional[AsyncEngine] = None
-_factory: Optional[async_sessionmaker] = None
+_engine: AsyncEngine | None = None
+_factory: async_sessionmaker | None = None
 
 
 def _init() -> None:
