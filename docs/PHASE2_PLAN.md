@@ -6,15 +6,16 @@
 
 ## Milestones
 
-1. Alembic migrations
-   - Add `alembic` to `apps/api/pyproject.toml`
-   - Create `apps/api/alembic/` with initial migration for `models.py`
-   - Add `alembic upgrade head` to local runbook
+1. Alembic migrations — done
+   - `apps/api/alembic/` initialized, `env.py` uses async engine + `bookverse.models.Base.metadata`, DB URL computed from `bookverse.config.settings` (not duplicated in `alembic.ini`)
+   - Initial migration `1b194cbf3fde_initial_schema.py` covers all current models; `alembic upgrade head` / `downgrade base` verified round-trip against local Postgres
+   - Note: async SQLAlchemy requires the `greenlet` package explicitly (not pulled in automatically by `sqlalchemy>=2.0.30` alone) — now pinned in `pyproject.toml`
 
-2. Auth & users
-   - `/auth/register`, `/auth/login`, `/auth/me`
-   - JWT + refresh tokens
-   - `UserProfile` + `UserPreferences` scoped to logged-in users
+2. Auth & users — partially done
+   - `/auth/register`, `/auth/login`, `/auth/me` implemented in `routers/auth.py` and wired into `main.py`, verified end-to-end against local Postgres
+   - Access tokens only so far — refresh tokens not yet implemented
+   - `UserPreferences` scoping not yet wired to any endpoint
+   - Note: `passlib[bcrypt]==1.7.4`'s backend detection is broken by `bcrypt>=4.1` (raises `ValueError: password cannot be longer than 72 bytes` on first hash call) — `bcrypt` is now pinned to `>=4.0,<4.1` in `pyproject.toml`
 
 3. Ingestion pipeline
    - `app/bookverse/connectors/` with source interfaces
@@ -35,6 +36,6 @@
    - Structured logging, metrics, health checks for DB/Redis/Ollama/OpenSearch
 
 ## Immediate next steps
-1. Add Alembic init + first migration for `models.py`
-2. Add `/auth` routers
-3. Add connectors skeleton plus OpenLibrary client
+1. Add connectors skeleton plus OpenLibrary client
+2. Wire `UserPreferences` to authenticated endpoints; add refresh tokens
+3. Decide whether `/api/recommend` (currently implemented client-side in `apps/web` calling Anthropic directly) should move behind this API instead
